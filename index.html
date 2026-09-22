@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledger &mdash; Integrated AIS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#1C2321;
+  --ink-soft:#4B5350;
+  --paper:#F7F5EF;
+  --paper-raised:#FFFFFF;
+  --rule:#DAD5C6;
+  --rule-strong:#C3BCA6;
+  --green:#1F5D4E;
+  --green-deep:#123B31;
+  --green-tint:#E4EEE9;
+  --gold:#A9791F;
+  --gold-tint:#F5EBD3;
+  --red:#A63A2E;
+  --red-tint:#F6E4E0;
+  --shadow:none;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#EDEAE0;
+    --ink-soft:#B3AFA0;
+    --paper:#15201C;
+    --paper-raised:#1C2925;
+    --rule:#2D3A34;
+    --rule-strong:#3D4B44;
+    --green:#5FAE97;
+    --green-deep:#7FC7AF;
+    --green-tint:#1E332C;
+    --gold:#D6AD5C;
+    --gold-tint:#3A2F17;
+    --red:#E08575;
+    --red-tint:#3A211D;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#EDEAE0;
+  --ink-soft:#B3AFA0;
+  --paper:#15201C;
+  --paper-raised:#1C2925;
+  --rule:#2D3A34;
+  --rule-strong:#3D4B44;
+  --green:#5FAE97;
+  --green-deep:#7FC7AF;
+  --green-tint:#1E332C;
+  --gold:#D6AD5C;
+  --gold-tint:#3A2F17;
+  --red:#E08575;
+  --red-tint:#3A211D;
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Inter',sans-serif;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  -webkit-font-smoothing:antialiased;
+}
+.num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+::selection{background:var(--gold-tint);}
+
+#shell{display:flex;min-height:100%;}
+
+/* Sidebar */
+#sidebar{
+  width:240px;flex-shrink:0;
+  background:var(--green-deep);
+  color:#EDEFE9;
+  display:flex;flex-direction:column;
+  padding:1.4rem 1rem;
+  position:sticky;top:env(safe-area-inset-top,0px);
+  height:100vh;height:100dvh;
+}
+.brand{padding:0 .4rem 1.4rem;border-bottom:1px solid rgba(255,255,255,.14);margin-bottom:1rem;}
+.brand-mark{font-family:'Fraunces',serif;font-weight:600;font-size:1.28rem;letter-spacing:.01em;color:#fff;line-height:1.15;}
+.brand-sub{font-size:.72rem;color:#B9CFC5;margin-top:.35rem;line-height:1.4;}
+nav.navlist{display:flex;flex-direction:column;gap:2px;flex:1;}
+.navbtn{
+  display:flex;align-items:center;gap:.65rem;
+  padding:.62rem .7rem;border-radius:8px;border:none;background:transparent;
+  color:#CFE0D8;font-family:'Inter',sans-serif;font-size:.9rem;font-weight:500;
+  text-align:left;cursor:pointer;width:100%;
+}
+.navbtn:hover{background:rgba(255,255,255,.07);color:#fff;}
+.navbtn.active{background:rgba(255,255,255,.13);color:#fff;}
+.navbtn .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);opacity:0;flex-shrink:0;}
+.navbtn.active .dot{opacity:1;}
+.navfoot{padding-top:1rem;border-top:1px solid rgba(255,255,255,.14);margin-top:.6rem;}
+.navfoot div{font-size:.7rem;color:#8FAA9E;line-height:1.5;}
+.resetlink{background:none;border:none;color:#8FAA9E;font-size:.72rem;text-decoration:underline;cursor:pointer;padding:.4rem 0 0;font-family:'Inter',sans-serif;}
+.resetlink:hover{color:#fff;}
+
+/* Main */
+#main{flex:1;min-width:0;padding:1.6rem 2.2rem 3rem;max-width:1200px;}
+.topbar{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1.5rem;}
+.topbar h1{font-family:'Fraunces',serif;font-weight:600;font-size:1.6rem;margin:0;}
+.topbar .today{font-size:.82rem;color:var(--ink-soft);}
+
+.btn{
+  font-family:'Inter',sans-serif;font-size:.84rem;font-weight:600;
+  padding:.55rem 1rem;border-radius:7px;border:1px solid var(--rule-strong);
+  background:var(--paper-raised);color:var(--ink);cursor:pointer;
+}
+.btn:hover{border-color:var(--green);}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff;}
+.btn.primary:hover{background:var(--green-deep);}
+.btn.danger{background:var(--paper-raised);border-color:var(--red);color:var(--red);}
+.btn.danger:hover{background:var(--red-tint);}
+.btn.sm{padding:.32rem .65rem;font-size:.76rem;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+/* Cards / stat grid */
+.grid{display:grid;gap:14px;}
+.grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr));}
+.grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr));}
+@media(max-width:860px){.grid.cols-4{grid-template-columns:repeat(2,minmax(0,1fr));}.grid.cols-2{grid-template-columns:1fr;}}
+@media(max-width:520px){.grid.cols-4{grid-template-columns:1fr;}}
+
+.stat{background:var(--paper-raised);border:1px solid var(--rule);border-radius:var(--radius);padding:1rem 1.1rem;}
+.stat .label{font-size:.74rem;color:var(--ink-soft);margin-bottom:.4rem;}
+.stat .value{font-family:'Fraunces',serif;font-size:1.55rem;font-weight:600;}
+.stat .sub{font-size:.72rem;color:var(--ink-soft);margin-top:.3rem;}
+.stat.warn .value{color:var(--red);}
+
+.card{background:var(--paper-raised);border:1px solid var(--rule);border-radius:var(--radius);padding:1.2rem 1.3rem;margin-bottom:1.1rem;}
+.card h2{font-family:'Fraunces',serif;font-size:1.05rem;font-weight:600;margin:0 0 .9rem;}
+.card .headrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;flex-wrap:wrap;gap:.6rem;}
+.card .headrow h2{margin:0;}
+
+/* Tables */
+.twrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:.86rem;}
+th{text-align:left;font-size:.7rem;letter-spacing:.02em;color:var(--ink-soft);font-weight:600;padding:.5rem .6rem;border-bottom:1.5px solid var(--rule-strong);white-space:nowrap;}
+td{padding:.55rem .6rem;border-bottom:1px solid var(--rule);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+td.num,th.num{text-align:right;}
+tbody tr:hover{background:var(--green-tint);}
+.rowactions{display:flex;gap:.4rem;justify-content:flex-end;}
+.muted{color:var(--ink-soft);}
+.small{font-size:.76rem;}
+
+.pill{display:inline-block;padding:.16rem .55rem;border-radius:20px;font-size:.7rem;font-weight:600;}
+.pill.green{background:var(--green-tint);color:var(--green);}
+.pill.gold{background:var(--gold-tint);color:var(--gold);}
+.pill.red{background:var(--red-tint);color:var(--red);}
+.pill.gray{background:var(--rule);color:var(--ink-soft);}
+
+input,select,textarea{
+  font-family:'Inter',sans-serif;font-size:.86rem;color:var(--ink);
+  background:var(--paper-raised);border:1px solid var(--rule-strong);border-radius:7px;
+  padding:.5rem .6rem;width:100%;
+}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-offset:1px;}
+label{font-size:.74rem;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:.3rem;}
+.field{margin-bottom:.85rem;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;}
+@media(max-width:520px){.field-row{grid-template-columns:1fr;}}
+
+.searchbar{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:.9rem;}
+.searchbar input,.searchbar select{width:auto;flex:1;min-width:150px;}
+
+.empty{text-align:center;padding:2.2rem 1rem;color:var(--ink-soft);}
+.empty .big{font-family:'Fraunces',serif;font-size:1.1rem;color:var(--ink);margin-bottom:.3rem;}
+
+/* Modal */
+#overlay{position:fixed;inset:0;background:rgba(15,20,18,.45);display:none;align-items:flex-start;justify-content:center;padding:5vh 1rem;z-index:50;overflow-y:auto;}
+#overlay.show{display:flex;}
+.modal{background:var(--paper-raised);border-radius:12px;max-width:640px;width:100%;padding:1.5rem 1.6rem;border:1px solid var(--rule);margin-bottom:5vh;}
+.modal h3{font-family:'Fraunces',serif;font-size:1.2rem;margin:0 0 1rem;}
+.modal .close{float:right;background:none;border:none;font-size:1.3rem;color:var(--ink-soft);cursor:pointer;line-height:1;}
+.modal-actions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--rule);}
+
+.lineitems{border:1px solid var(--rule);border-radius:8px;overflow:hidden;margin-bottom:.6rem;}
+.lineitems table{font-size:.82rem;}
+.lineitems select,.lineitems input{padding:.35rem .45rem;font-size:.82rem;}
+
+.toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:.6rem 1.1rem;border-radius:8px;font-size:.84rem;z-index:80;opacity:0;pointer-events:none;transition:opacity .2s;}
+.toast.show{opacity:1;}
+
+.chartwrap{position:relative;height:230px;}
+
+@media(max-width:760px){
+  #sidebar{position:fixed;left:0;top:0;bottom:0;z-index:40;transform:translateX(-100%);transition:transform .2s;}
+  #sidebar.open{transform:translateX(0);}
+  #main{padding:1.1rem 1rem 3rem;}
+  .menubtn{display:inline-flex !important;}
+  #scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35;display:none;}
+  #scrim.show{display:block;}
+}
+.menubtn{display:none;background:none;border:1px solid var(--rule-strong);border-radius:7px;width:36px;height:36px;align-items:center;justify-content:center;margin-right:.6rem;cursor:pointer;color:var(--ink);}
+
+/* Login with Image Background[cite: 2] */
+#loginscreen{
+  min-height:100vh;
+  min-height:100dvh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url('file:///C:/Users/usrt/Downloads/FOLDER/rich_0.2.jpg') no-repeat center center;
+  background-size:cover;
+  padding:1.5rem;
+}
+.loginbox{background:var(--paper-raised);border-radius:14px;max-width:380px;width:100%;padding:2rem 2rem 1.8rem;}
+.loginbox .brand-mark{color:var(--ink);font-family:'Fraunces',serif;font-weight:600;font-size:1.4rem;margin-bottom:.2rem;}
+.loginbox .brand-sub{color:var(--ink-soft);font-size:.8rem;margin-bottom:1.6rem;line-height:1.5;}
+.loginbox .field{margin-bottom:1rem;}
+.loginerr{color:var(--red);font-size:.8rem;min-height:1.1em;margin-bottom:.4rem;}
+.loginhint{font-size:.74rem;color:var(--ink-soft);background:var(--gold-tint);border-radius:8px;padding:.6rem .75rem;margin-top:1.2rem;line-height:1.5;}
+.sidebar-user{display:flex;align-items:center;gap:.55rem;padding:.5rem .4rem;margin-bottom:.3rem;}
+.sidebar-user .avatar{width:30px;height:30px;border-radius:50%;background:var(--gold);color:var(--green-deep);font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sidebar-user .who{font-size:.82rem;color:#fff;font-weight:600;line-height:1.2;}
+.sidebar-user .role{font-size:.7rem;color:#9FC0B2;}
+.logoutbtn{width:100%;text-align:left;background:none;border:1px solid rgba(255,255,255,.18);color:#CFE0D8;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;padding:.5rem .7rem;border-radius:7px;cursor:pointer;margin-top:.5rem;}
+.logoutbtn:hover{background:rgba(255,255,255,.08);color:#fff;}
+</style>
+</head>
+<body>
+<div id="loginscreen">
+  <div class="loginbox">
+    <div class="brand-mark">Ledger AIS</div>
+    <div class="brand-sub">Integrated Accounting Information System<br>Sign in to continue.</div>
+    <div class="field"><label>Username</label><input id="li_user" placeholder="admin" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('li_pass').focus()"></div>
+    <div class="field"><label>Password</label><input id="li_pass" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="loginerr" id="li_err"></div>
+    <button class="btn primary" style="width:100%;" onclick="doLogin()">Sign in</button>
+    <div class="loginhint">Demo admin account &mdash; username <strong>admin</strong>, password <strong>Rich</strong>.</div>
+  </div>
+</div>
+<div id="shell" style="display:none;">
+  <div id="scrim" onclick="toggleSidebar(false)"></div>
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">Ledger AIS</div>
+      <div class="brand-sub">Integrated Accounting Info System<br>Inventory &middot; Sales &middot; Supplier &middot; Purchases</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar" id="userAvatar">A</div>
+      <div><div class="who" id="userWho">Admin</div><div class="role">Administrator</div></div>
+    </div>
+    <nav class="navlist" id="navlist"></nav>
+    <div class="navfoot">
+      <div id="bizname">San Mateo, Rizal &middot; Medium Enterprise</div>
+      <button class="resetlink" onclick="confirmReset()">Reset demo data</button>
+      <button class="logoutbtn" onclick="doLogout()">Log out</button>
+    </div>
+  </aside>
+  <main id="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;">
+        <button class="menubtn" onclick="toggleSidebar(true)">&#9776;</button>
+        <h1 id="viewtitle">Dashboard</h1>
+      </div>
+      <div class="today" id="todaylabel"></div>
+    </div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div id="overlay"><div class="modal" id="modalbody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ DATA LAYER ============ */
+const STORE_KEY = 'ledger_ais_v1';
+const ACCOUNTS = ['Cash','Accounts Receivable','Accounts Payable','Inventory','Sales Revenue','Cost of Goods Sold'];
+
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtMoney(n){ return '\u20b1' + (Math.round((n||0)*100)/100).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDate(d){ const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'}); }
+function uid(prefix){ DB.meta.seq++; return prefix + String(DB.meta.seq).padStart(4,'0'); }
+
+function seedDB(){
+  const db = {
+    meta:{ seq: 0, admin:{ username:'admin', password:'Rich', name:'Admin' } },
+    products:[], suppliers:[], purchases:[], sales:[], journal:[]
+  };
+  DB = db;
+  const sup = (name,contact,phone,email,addr)=>{
+    const s = {id:uid('SUP-'),name,contact,phone,email,address:addr};
+    DB.suppliers.push(s); return s.id;
+  };
+  const s1 = sup('Rizal Hardware & Supply Corp.','Ramon Cruz','0917-234-5566','sales@rizalhardware.ph','J.P. Rizal St., San Mateo, Rizal');
+  const s2 = sup('Montalban Trading Inc.','Liza Fernandez','0918-887-1122','orders@montalbantrading.com','Gen. Luna St., Montalban, Rizal');
+  const s3 = sup('Sto. Nino Distributors','Ben Ramos','0920-441-9090','contact@stoninodist.ph','A. Bonifacio Ave., San Mateo, Rizal');
+
+  const prod = (sku,name,category,unit,cost,price,qty,reorder)=>{
+    const p = {id:uid('PRD-'),sku,name,category,unit,costPrice:cost,sellingPrice:price,quantity:qty,reorderLevel:reorder};
+    DB.products.push(p); return p.id;
+  };
+  const p1 = prod('CEM-001','Portland Cement 40kg','Construction','bag',215,255,120,30);
+  const p2 = prod('GI-014','GI Sheet 4ft x 8ft (Gauge 26)','Construction','sheet',480,585,40,10);
+  const p3 = prod('PVC-022','PVC Pipe 1/2in x 10ft','Plumbing','pc',95,135,85,20);
+  const p4 = prod('PNT-005','Latex Paint White 4L','Paint','can',420,540,26,8);
+  const p5 = prod('NAIL-3','Common Nails 3in','Hardware','kg',72,98,60,15);
+  const p6 = prod('WIRE-12','Electrical Wire #12 THHN 75m','Electrical','roll',1450,1780,14,5);
+  const p7 = prod('TILE-30','Ceramic Floor Tile 30x30','Construction','box',390,470,7,10);
+  const p8 = prod('LOCK-02','Door Knob Lockset','Hardware','set',310,410,18,6);
+
+  const supAdd = (poNo,supplierId,date,items,status,dateReceived)=>{
+    const total = items.reduce((a,i)=>a+i.qty*i.unitCost,0);
+    const po = {id:uid('PO-'),poNumber:poNo,supplierId,date,items,status,total,dateReceived:dateReceived||null};
+    DB.purchases.push(po);
+    if(status==='Received'){
+      items.forEach(it=>{ const p=DB.products.find(x=>x.id===it.productId); if(p) p.quantity += it.qty; });
+      postJournal(dateReceived||date,'PO '+poNo,'Purchase received into inventory',[
+        {account:'Inventory',debit:total,credit:0},
+        {account:'Accounts Payable',debit:0,credit:total}
+      ]);
+    }
+    return po.id;
+  };
+  supAdd('PO-2026-0031', s1, '2026-08-04', [{productId:p1,qty:80,unitCost:215},{productId:p5,qty:40,unitCost:72}], 'Received','2026-08-06');
+  supAdd('PO-2026-0032', s2, '2026-08-18', [{productId:p2,qty:20,unitCost:480},{productId:p6,qty:10,unitCost:1450}], 'Received','2026-08-20');
+  supAdd('PO-2026-0033', s3, '2026-09-10', [{productId:p4,qty:18,unitCost:420},{productId:p8,qty:12,unitCost:310}], 'Received','2026-09-12');
+  supAdd('PO-2026-0034', s1, '2026-09-19', [{productId:p3,qty:60,unitCost:95},{productId:p7,qty:10,unitCost:390}], 'Pending', null);
+
+  const saleAdd = (invNo,customer,date,items,paymentType)=>{
+    let total=0, cogs=0;
+    items.forEach(it=>{ const p=DB.products.find(x=>x.id===it.productId); total += it.qty*it.unitPrice; cogs += it.qty*(p?p.costPrice:0); });
+    const sale={id:uid('INV-'),invNumber:invNo,customer,date,items,total,paymentType,status:'Completed'};
+    DB.sales.push(sale);
+    items.forEach(it=>{ const p=DB.products.find(x=>x.id===it.productId); if(p) p.quantity -= it.qty; });
+    const cashAcct = paymentType==='On Account' ? 'Accounts Receivable' : 'Cash';
+    postJournal(date,'INV '+invNo,'Sale to '+customer,[
+      {account:cashAcct,debit:total,credit:0},
+      {account:'Sales Revenue',debit:0,credit:total},
+      {account:'Cost of Goods Sold',debit:cogs,credit:0},
+      {account:'Inventory',debit:0,credit:cogs}
+    ]);
+    return sale.id;
+  };
+  saleAdd('INV-2026-1140','JR Construction Supply','2026-08-10',[{productId:p1,qty:25,unitPrice:255},{productId:p5,qty:8,unitPrice:98}],'Cash');
+  saleAdd('INV-2026-1141','Villanueva Residence','2026-08-22',[{productId:p2,qty:6,unitPrice:585},{productId:p6,qty:2,unitPrice:1780}],'On Account');
+  saleAdd('INV-2026-1142','San Mateo Homebuilders','2026-09-02',[{productId:p3,qty:30,unitPrice:135},{productId:p4,qty:4,unitPrice:540}],'Cash');
+  saleAdd('INV-2026-1143','De Leon Hardware Retail','2026-09-15',[{productId:p1,qty:15,unitPrice:255},{productId:p8,qty:5,unitPrice:410}],'On Account');
+  saleAdd('INV-2026-1144','Rodriguez Apartments Project','2026-09-20',[{productId:p2,qty:5,unitPrice:585},{productId:p3,qty:10,unitPrice:135},{productId:p5,qty:6,unitPrice:98}],'Cash');
+
+  saveDB();
+}
+
+function postJournal(date,ref,description,lines){
+  DB.journal.push({id:uid('JE-'),date,ref,description,lines});
+}
+
+let DB = null;
+function loadDB(){
+  const raw = localStorage.getItem(STORE_KEY);
+  if(raw){ try{ DB = JSON.parse(raw); if(!DB.meta) DB.meta={seq:0}; if(!DB.meta.admin) DB.meta.admin={username:'admin',password:'Rich',name:'Admin'}; return; }catch(e){} }
+  seedDB();
+}
+function saveDB(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){ console.error('save failed',e); }
+}
+function confirmReset(){
+  if(confirm('Reset all data back to the sample dataset? This cannot be undone.')){
+    seedDB(); navigate(currentView); toast('Demo data reset.');
+  }
+}
+
+/* ============ HELPERS ============ */
+function productName(id){ const p=DB.products.find(x=>x.id===id); return p?p.name:'(deleted product)'; }
+function supplierName(id){ const s=DB.suppliers.find(x=>x.id===id); return s?s.name:'(deleted supplier)'; }
+function monthKey(d){ return d.slice(0,7); }
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(window.__toastT); window.__toastT=setTimeout(()=>t.classList.remove('show'),2400);
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function opt(list,val){ return list.map(x=>`<option value="${esc(x.id)}" ${x.id===val?'selected':''}>${esc(x.name||x.sku+' - '+x.name)}</option>`).join(''); }
+
+/* ============ NAV / ROUTER ============ */
+const VIEWS = [
+  {id:'dashboard', label:'Dashboard'},
+  {id:'inventory', label:'Inventory'},
+  {id:'sales', label:'Sales'},
+  {id:'suppliers', label:'Suppliers'},
+  {id:'purchases', label:'Purchases'},
+  {id:'accounting', label:'Accounting'},
+];
+let currentView='dashboard';
+let currentChart=null;
+
+function renderNav(){
+  const nav=document.getElementById('navlist');
+  nav.innerHTML = VIEWS.map(v=>`<button class="navbtn ${v.id===currentView?'active':''}" onclick="navigate('${v.id}')"><span class="dot"></span>${v.label}</button>`).join('');
+}
+function navigate(id){
+  currentView=id;
+  document.getElementById('viewtitle').textContent = VIEWS.find(v=>v.id===id).label;
+  renderNav();
+  toggleSidebar(false);
+  const el=document.getElementById('view');
+  if(id==='dashboard') el.innerHTML = renderDashboard();
+  else if(id==='inventory') el.innerHTML = renderInventory();
+  else if(id==='sales') el.innerHTML = renderSales();
+  else if(id==='suppliers') el.innerHTML = renderSuppliers();
+  else if(id==='purchases') el.innerHTML = renderPurchases();
+  else if(id==='accounting') el.innerHTML = renderAccounting();
+  if(id==='dashboard') drawChart();
+}
+function toggleSidebar(open){
+  const sb=document.getElementById('sidebar'), sc=document.getElementById('scrim');
+  if(open===undefined) open = !sb.classList.contains('open');
+  sb.classList.toggle('open',open); sc.classList.toggle('show',open);
+}
+
+/* ============ MODAL ============ */
+function openModal(html){
+  document.getElementById('modalbody').innerHTML = html;
+  document.getElementById('overlay').classList.add('show');
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
+
+/* ============ DASHBOARD ============ */
+function renderDashboard(){
+  const now = new Date();
+  const thisMonth = todayISO().slice(0,7);
+  const salesThisMonth = DB.sales.filter(s=>s.status==='Completed' && monthKey(s.date)===thisMonth);
+  const revenueThisMonth = salesThisMonth.reduce((a,s)=>a+s.total,0);
+  const invValue = DB.products.reduce((a,p)=>a+p.quantity*p.costPrice,0);
+  const lowStock = DB.products.filter(p=>p.quantity<=p.reorderLevel);
+  const pendingPOs = DB.purchases.filter(p=>p.status==='Pending');
+
+  const qtySold={};
+  DB.sales.filter(s=>s.status==='Completed').forEach(s=>s.items.forEach(it=>{ qtySold[it.productId]=(qtySold[it.productId]||0)+it.qty; }));
+  const topProducts = Object.entries(qtySold).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  return `
+  <div class="grid cols-4" style="margin-bottom:1.1rem;">
+    <div class="stat"><div class="label">Sales this month</div><div class="value num">${fmtMoney(revenueThisMonth)}</div><div class="sub">${salesThisMonth.length} invoice(s)</div></div>
+    <div class="stat"><div class="label">Inventory value</div><div class="value num">${fmtMoney(invValue)}</div><div class="sub">${DB.products.length} SKUs on hand</div></div>
+    <div class="stat ${lowStock.length?'warn':''}"><div class="label">Low stock items</div><div class="value num">${lowStock.length}</div><div class="sub">at or below reorder level</div></div>
+    <div class="stat"><div class="label">Pending purchase orders</div><div class="value num">${pendingPOs.length}</div><div class="sub">awaiting receipt</div></div>
+  </div>
+  <div class="grid cols-2">
+    <div class="card">
+      <h2>Sales trend, last 6 months</h2>
+      <div class="chartwrap"><canvas id="salesChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Low stock alert</h2>
+      ${lowStock.length? `<div class="twrap"><table><thead><tr><th>Product</th><th class="num">On hand</th><th class="num">Reorder at</th></tr></thead><tbody>
+        ${lowStock.map(p=>`<tr><td>${esc(p.name)}</td><td class="num num">${p.quantity} ${esc(p.unit)}</td><td class="num num muted">${p.reorderLevel}</td></tr>`).join('')}
+      </tbody></table></div>` : `<div class="empty small">No items are below their reorder level.</div>`}
+    </div>
+  </div>
+  <div class="card">
+    <h2>Top selling products</h2>
+    ${topProducts.length? `<div class="twrap"><table><thead><tr><th>Product</th><th class="num">Units sold</th></tr></thead><tbody>
+      ${topProducts.map(([id,qty])=>`<tr><td>${esc(productName(id))}</td><td class="num num">${qty}</td></tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty small">No completed sales yet.</div>`}
+  </div>`;
+}
+function drawChart(){
+  const ctx = document.getElementById('salesChart'); if(!ctx) return;
+  const months=[]; const now=new Date();
+  for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); months.push(d.toISOString().slice(0,7)); }
+  const labels = months.map(m=>{ const [y,mo]=m.split('-'); return new Date(y,mo-1,1).toLocaleDateString('en-PH',{month:'short'}); });
+  const data = months.map(m=> DB.sales.filter(s=>s.status==='Completed'&&monthKey(s.date)===m).reduce((a,s)=>a+s.total,0));
+  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)';
+  const textColor = isDark ? '#B3AFA0' : '#4B5350';
+  if(currentChart) currentChart.destroy();
+  currentChart = new Chart(ctx,{
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Sales', data, backgroundColor:'#1F5D4E', borderRadius:4, maxBarThickness:42 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>fmtMoney(c.parsed.y) } } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{color:textColor,font:{family:'Inter'}} },
+        y:{ grid:{color:gridColor}, ticks:{color:textColor,font:{family:'Inter'},callback:v=>'\u20b1'+v.toLocaleString()} }
+      }
+    }
+  });
+}
+
+/* ============ INVENTORY ============ */
+let invFilter={ search:'', category:'' };
+function renderInventory(){
+  const cats = [...new Set(DB.products.map(p=>p.category))];
+  let items = DB.products.filter(p=>{
+    const s = invFilter.search.toLowerCase();
+    const matchS = !s || p.name.toLowerCase().includes(s) || p.sku.toLowerCase().includes(s);
+    const matchC = !invFilter.category || p.category===invFilter.category;
+    return matchS && matchC;
+  });
+  return `
+  <div class="card">
+    <div class="headrow">
+      <h2>Product catalog</h2>
+      <button class="btn primary" onclick="openProductForm()">+ Add product</button>
+    </div>
+    <div class="searchbar">
+      <input placeholder="Search by name or SKU" value="${esc(invFilter.search)}" oninput="invFilter.search=this.value;renderInto()">
+      <select onchange="invFilter.category=this.value;renderInto()">
+        <option value="">All categories</option>
+        ${cats.map(c=>`<option value="${esc(c)}" ${c===invFilter.category?'selected':''}>${esc(c)}</option>`).join('')}
+      </select>
+    </div>
+    ${items.length? `<div class="twrap"><table><thead><tr>
+      <th>SKU</th><th>Name</th><th>Category</th><th class="num">On hand</th><th class="num">Cost</th><th class="num">Price</th><th>Status</th><th></th>
+    </tr></thead><tbody>
+      ${items.map(p=>`<tr>
+        <td class="num small muted">${esc(p.sku)}</td>
+        <td>${esc(p.name)}</td>
+        <td class="small muted">${esc(p.category)}</td>
+        <td class="num num">${p.quantity} ${esc(p.unit)}</td>
+        <td class="num num">${fmtMoney(p.costPrice)}</td>
+        <td class="num num">${fmtMoney(p.sellingPrice)}</td>
+        <td>${p.quantity<=p.reorderLevel? '<span class="pill red">Low stock</span>' : '<span class="pill green">In stock</span>'}</td>
+        <td><div class="rowactions">
+          <button class="btn sm" onclick="openProductForm('${p.id}')">Edit</button>
+          <button class="btn sm danger" onclick="deleteProduct('${p.id}')">Delete</button>
+        </div></td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty"><div class="big">No products found</div>Try a different search or add a new product.</div>`}
+  </div>`;
+}
+function renderInto(){ document.getElementById('view').innerHTML = (({dashboard:renderDashboard,inventory:renderInventory,sales:renderSales,suppliers:renderSuppliers,purchases:renderPurchases,accounting:renderAccounting})[currentView])(); if(currentView==='dashboard') drawChart(); }
+
+function openProductForm(id){
+  const p = id ? DB.products.find(x=>x.id===id) : null;
+  openModal(`
+    <button class="close" onclick="closeModal()">&times;</button>
+    <h3>${p?'Edit product':'Add product'}</h3>
+    <div class="field-row">
+      <div class="field"><label>SKU</label><input id="f_sku" value="${p?esc(p.sku):''}"></div>
+      <div class="field"><label>Category</label><input id="f_cat" value="${p?esc(p.category):''}" placeholder="e.g. Construction"></div>
+    </div>
+    <div class="field"><label>Product name</label><input id="f_name" value="${p?esc(p.name):''}"></div>
+    <div class="field-row">
+      <div class="field"><label>Unit</label><input id="f_unit" value="${p?esc(p.unit):''}" placeholder="pc, bag, box..."></div>
+      <div class="field"><label>Reorder level</label><input id="f_reorder" type="number" min="0" value="${p?p.reorderLevel:5}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Cost price (\u20b1)</label><input id="f_cost" type="number" min="0" step="0.01" value="${p?p.costPrice:''}"></div>
+      <div class="field"><label>Selling price (\u20b1)</label><input id="f_price" type="number" min="0" step="0.01" value="${p?p.sellingPrice:''}"></div>
+    </div>
+    <div class="field"><label>Quantity on hand</label><input id="f_qty" type="number" min="0" value="${p?p.quantity:0}"></div>
+    <div id="f_err" class="small" style="color:var(--red);"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveProduct(${p?`'${p.id}'`:'null'})">Save product</button>
+    </div>
+  `);
+}
+function saveProduct(id){
+  const name=document.getElementById('f_name').value.trim();
+  const sku=document.getElementById('f_sku').value.trim();
+  const cat=document.getElementById('f_cat').value.trim()||'General';
+  const unit=document.getElementById('f_unit').value.trim()||'pc';
+  const cost=parseFloat(document.getElementById('f_cost').value);
+  const price=parseFloat(document.getElementById('f_price').value);
+  const qty=parseInt(document.getElementById('f_qty').value);
+  const reorder=parseInt(document.getElementById('f_reorder').value);
+  if(!name || !sku || isNaN(cost) || isNaN(price) || isNaN(qty) || isNaN(reorder)){
+    document.getElementById('f_err').textContent='Please fill in all fields with valid values.'; return;
+  }
+  if(id){
+    const p=DB.products.find(x=>x.id===id);
+    Object.assign(p,{name,sku,category:cat,unit,costPrice:cost,sellingPrice:price,quantity:qty,reorderLevel:reorder});
+  } else {
+    DB.products.push({id:uid('PRD-'),sku,name,category:cat,unit,costPrice:cost,sellingPrice:price,quantity:qty,reorderLevel:reorder});
+  }
+  saveDB(); closeModal(); navigate('inventory'); toast('Product saved.');
+}
+function deleteProduct(id){
+  if(!confirm('Delete this product? This cannot be undone.')) return;
+  DB.products = DB.products.filter(p=>p.id!==id);
+  saveDB(); navigate('inventory'); toast('Product deleted.');
+}
+
+/* ============ SUPPLIERS ============ */
+function renderSuppliers(){
+  return `
+  <div class="card">
+    <div class="headrow"><h2>Suppliers</h2><button class="btn primary" onclick="openSupplierForm()">+ Add supplier</button></div>
+    ${DB.suppliers.length? `<div class="twrap"><table><thead><tr><th>Name</th><th>Contact person</th><th>Phone</th><th>Email</th><th>Address</th><th></th></tr></thead><tbody>
+      ${DB.suppliers.map(s=>`<tr>
+        <td>${esc(s.name)}</td><td>${esc(s.contact)}</td><td class="num small">${esc(s.phone)}</td><td class="small">${esc(s.email)}</td><td class="small muted">${esc(s.address)}</td>
+        <td><div class="rowactions"><button class="btn sm" onclick="openSupplierForm('${s.id}')">Edit</button><button class="btn sm danger" onclick="deleteSupplier('${s.id}')">Delete</button></div></td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty"><div class="big">No suppliers yet</div>Add your first supplier to start recording purchases.</div>`}
+  </div>`;
+}
+function openSupplierForm(id){
+  const s = id ? DB.suppliers.find(x=>x.id===id) : null;
+  openModal(`
+    <button class="close" onclick="closeModal()">&times;</button>
+    <h3>${s?'Edit supplier':'Add supplier'}</h3>
+    <div class="field"><label>Company name</label><input id="s_name" value="${s?esc(s.name):''}"></div>
+    <div class="field-row">
+      <div class="field"><label>Contact person</label><input id="s_contact" value="${s?esc(s.contact):''}"></div>
+      <div class="field"><label>Phone</label><input id="s_phone" value="${s?esc(s.phone):''}"></div>
+    </div>
+    <div class="field"><label>Email</label><input id="s_email" value="${s?esc(s.email):''}"></div>
+    <div class="field"><label>Address</label><input id="s_addr" value="${s?esc(s.address):''}"></div>
+    <div id="s_err" class="small" style="color:var(--red);"></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveSupplier(${s?`'${s.id}'`:'null'})">Save supplier</button></div>
+  `);
+}
+function saveSupplier(id){
+  const name=document.getElementById('s_name').value.trim();
+  const contact=document.getElementById('s_contact').value.trim();
+  const phone=document.getElementById('s_phone').value.trim();
+  const email=document.getElementById('s_email').value.trim();
+  const address=document.getElementById('s_addr').value.trim();
+  if(!name){ document.getElementById('s_err').textContent='Company name is required.'; return; }
+  if(id){ Object.assign(DB.suppliers.find(x=>x.id===id),{name,contact,phone,email,address}); }
+  else{ DB.suppliers.push({id:uid('SUP-'),name,contact,phone,email,address}); }
+  saveDB(); closeModal(); navigate('suppliers'); toast('Supplier saved.');
+}
+function deleteSupplier(id){
+  if(DB.purchases.some(p=>p.supplierId===id)){ toast('Cannot delete: supplier has purchase records.'); return; }
+  if(!confirm('Delete this supplier?')) return;
+  DB.suppliers = DB.suppliers.filter(s=>s.id!==id);
+  saveDB(); navigate('suppliers'); toast('Supplier deleted.');
+}
+
+/* ============ PURCHASES ============ */
+let poDraftItems=[];
+function renderPurchases(){
+  const rows = [...DB.purchases].sort((a,b)=>b.date.localeCompare(a.date));
+  return `
+  <div class="card">
+    <div class="headrow"><h2>Purchase orders</h2><button class="btn primary" onclick="openPOForm()">+ New purchase order</button></div>
+    ${rows.length? `<div class="twrap"><table><thead><tr><th>PO number</th><th>Supplier</th><th>Date</th><th class="num">Items</th><th class="num">Total</th><th>Status</th><th></th></tr></thead><tbody>
+      ${rows.map(po=>`<tr>
+        <td class="num small">${esc(po.poNumber)}</td>
+        <td>${esc(supplierName(po.supplierId))}</td>
+        <td class="small">${fmtDate(po.date)}</td>
+        <td class="num">${po.items.length}</td>
+        <td class="num num">${fmtMoney(po.total)}</td>
+        <td>${po.status==='Received'?'<span class="pill green">Received</span>':'<span class="pill gold">Pending</span>'}</td>
+        <td><div class="rowactions">
+          <button class="btn sm" onclick="viewPO('${po.id}')">View</button>
+          ${po.status==='Pending'?`<button class="btn sm primary" onclick="receivePO('${po.id}')">Receive</button>`:''}
+        </div></td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty"><div class="big">No purchase orders yet</div>Create a purchase order to record stock coming from a supplier.</div>`}
+  </div>`;
+}
+function viewPO(id){
+  const po=DB.purchases.find(x=>x.id===id);
+  openModal(`
+    <button class="close" onclick="closeModal()">&times;</button>
+    <h3>${esc(po.poNumber)}</h3>
+    <p class="small muted">Supplier: ${esc(supplierName(po.supplierId))} &middot; Date: ${fmtDate(po.date)} &middot; Status: ${esc(po.status)}${po.dateReceived?(' &middot; Received: '+fmtDate(po.dateReceived)):''}</p>
+    <div class="lineitems"><table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Unit cost</th><th class="num">Subtotal</th></tr></thead><tbody>
+      ${po.items.map(it=>`<tr><td>${esc(productName(it.productId))}</td><td class="num">${it.qty}</td><td class="num">${fmtMoney(it.unitCost)}</td><td class="num">${fmtMoney(it.qty*it.unitCost)}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="small" style="text-align:right;"><strong>Total: ${fmtMoney(po.total)}</strong></p>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Close</button></div>
+  `);
+}
+function receivePO(id){
+  const po=DB.purchases.find(x=>x.id===id);
+  if(!confirm('Mark this purchase order as received? Inventory quantities will be updated.')) return;
+  po.status='Received'; po.dateReceived=todayISO();
+  po.items.forEach(it=>{ const p=DB.products.find(x=>x.id===it.productId); if(p) p.quantity += it.qty; });
+  postJournal(po.dateReceived,'PO '+po.poNumber,'Purchase received into inventory',[
+    {account:'Inventory',debit:po.total,credit:0},
+    {account:'Accounts Payable',debit:0,credit:po.total}
+  ]);
+  saveDB(); navigate('purchases'); toast('Purchase order received; stock updated.');
+}
+function openPOForm(){
+  if(!DB.suppliers.length){ toast('Add a supplier first.'); return; }
+  if(!DB.products.length){ toast('Add a product first.'); return; }
+  poDraftItems=[{productId:DB.products[0].id,qty:1,unitCost:DB.products[0].costPrice}];
+  openModal(poFormHTML());
+}
+function poFormHTML(){
+  const total = poDraftItems.reduce((a,i)=>a+i.qty*i.unitCost,0);
+  return `
+    <button class="close" onclick="closeModal()">&times;</button>
+    <h3>New purchase order</h3>
+    <div class="field-row">
+      <div class="field"><label>Supplier</label><select id="po_supplier">${opt(DB.suppliers)}</select></div>
+      <div class="field"><label>Date</label><input id="po_date" type="date" value="${todayISO()}"></div>
+    </div>
+    <label>Items</label>
+    <div class="lineitems"><table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Unit cost</th><th class="num">Subtotal</th><th></th></tr></thead><tbody id="po_items">
+      ${poDraftItems.map((it,i)=>`<tr>
+        <td><select onchange="poDraftItems[${i}].productId=this.value;poDraftItems[${i}].unitCost=DB.products.find(p=>p.id===this.value).costPrice;refreshPOForm()">${opt(DB.products,it.productId)}</select></td>
+        <td class="num"><input type="number" min="1" value="${it.qty}" style="width:64px" onchange="poDraftItems[${i}].qty=parseInt(this.value)||1;refreshPOForm()"></td>
+        <td class="num"><input type="number" min="0" step="0.01" value="${it.unitCost}" style="width:80px" onchange="poDraftItems[${i}].unitCost=parseFloat(this.value)||0;refreshPOForm()"></td>
+        <td class="num num">${fmtMoney(it.qty*it.unitCost)}</td>
+        <td><button class="btn sm danger" onclick="poDraftItems.splice(${i},1);refreshPOForm()">&times;</button></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+    <button class="btn sm" onclick="poDraftItems.push({productId:DB.products[0].id,qty:1,unitCost:DB.products[0].costPrice});refreshPOForm()">+ Add line</button>
+    <p class="small" style="text-align:right;margin-top:.7rem;"><strong>Total: ${fmtMoney(total)}</strong></p>
+    <div id="po_err" class="small" style="color:var(--red);"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="savePO()">Save as pending</button>
+    </div>
+  `;
+}
+function refreshPOForm(){
+  const supplier = document.getElementById('po_supplier') ? document.getElementById('po_supplier').value : DB.suppliers[0].id;
+  const date = document.getElementById('po_date') ? document.getElementById('po_date').value : todayISO();
+  openModal(poFormHTML());
+  document.getElementById('po_supplier').value = supplier;
+  document.getElementById('po_date').value = date;
+}
+function savePO(){
+  if(!poDraftItems.length){ document.getElementById('po_err').textContent='Add at least one line item.'; return; }
+  const supplierId=document.getElementById('po_supplier').value;
+  const date=document.getElementById('po_date').value;
+  if(!date){ document.getElementById('po_err').textContent='Select a date.'; return; }
+  const total = poDraftItems.reduce((a,i)=>a+i.qty*i.unitCost,0);
+  DB.purchases.push({id:uid('PO-'),poNumber:'PO-'+date.replace(/-/g,'')+'-'+(DB.meta.seq+1),supplierId,date,items:JSON.parse(JSON.stringify(poDraftItems)),status:'Pending',total,dateReceived:null});
+  saveDB(); closeModal(); navigate('purchases'); toast('Purchase order created.');
+}
+
+/* ============ SALES ============ */
+let saleDraftItems=[];
+function renderSales(){
+  const rows=[...DB.sales].sort((a,b)=>b.date.localeCompare(a.date));
+  return `
+  <div class="card">
+    <div class="headrow"><h2>Sales invoices</h2><button class="btn primary" onclick="openSaleForm()">+ New sale</button></div>
+    ${rows.length? `<div class="twrap"><table><thead><tr><th>Invoice #</th><th>Customer</th><th>Date</th><th class="num">Items</th><th class="num">Total</th><th>Payment</th><th></th></tr></thead><tbody>
+      ${rows.map(s=>`<tr>
+        <td class="num small">${esc(s.invNumber)}</td>
+        <td>${esc(s.customer)}</td>
+        <td class="small">${fmtDate(s.date)}</td>
+        <td class="num">${s.items.length}</td>
+        <td class="num num">${fmtMoney(s.total)}</td>
+        <td>${s.paymentType==='Cash'?'<span class="pill green">Cash</span>':'<span class="pill gold">On account</span>'}</td>
+        <td><div class="rowactions"><button class="btn sm" onclick="viewSale('${s.id}')">View</button></div></td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty"><div class="big">No sales recorded yet</div>Create your first invoice to see it here.</div>`}
+  </div>`;
+}
+function viewSale(id){
+  const s=DB.sales.find(x=>x.id===id);
+  openModal(`
+    <button class="close" onclick="closeModal()">&times;</button>
+    <h3>${esc(s.invNumber)}</h3>
+    <p class="small muted">Customer: ${esc(s.customer)} &middot; Date: ${fmtDate(s.date)} &middot; Payment: ${esc(s.paymentType)}</p>
+    <div class="lineitems"><table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Subtotal</th></tr></thead><tbody>
+      ${s.items.map(it=>`<tr><td>${esc(productName(it.productId))}</td><td class="num">${it.qty}</td><td class="num">${fmtMoney(it.unitPrice)}</td><td class="num">${fmtMoney(it.qty*it.unitPrice)}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="small" style="text-align:right;"><strong>Total: ${fmtMoney(s.total)}</strong></p>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Close</button></div>
+  `);
+}
+function openSaleForm(){
+  if(!DB.products.length){ toast('Add a product first.'); return; }
+  saleDraftItems=[{productId:DB.products[0].id,qty:1,unitPrice:DB.products[0].sellingPrice}];
+  openModal(saleFormHTML());
+}
+function saleFormHTML(){
+  const total = saleDraftItems.reduce((a,i)=>a+i.qty*i.unitPrice,0);
+  const stockWarnings = saleDraftItems.filter(it=>{ const p=DB.products.find(x=>x.id===it.productId); return p && it.qty>p.quantity; });
+  return `
+    <button class="close" onclick="closeModal()">&times;</button>
+    <h3>New sale</h3>
+    <div class="field-row">
+      <div class="field"><label>Customer name</label><input id="sl_customer" placeholder="Walk-in / Company name"></div>
+      <div class="field"><label>Date</label><input id="sl_date" type="date" value="${todayISO()}"></div>
+    </div>
+    <div class="field"><label>Payment type</label><select id="sl_payment"><option value="Cash">Cash</option><option value="On Account">On account</option></select></div>
+    <label>Items</label>
+    <div class="lineitems"><table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Subtotal</th><th></th></tr></thead><tbody>
+      ${saleDraftItems.map((it,i)=>{ const p=DB.products.find(x=>x.id===it.productId);
+        return `<tr>
+        <td><select onchange="saleDraftItems[${i}].productId=this.value;saleDraftItems[${i}].unitPrice=DB.products.find(p=>p.id===this.value).sellingPrice;refreshSaleForm()">${opt(DB.products,it.productId)}</select></td>
+        <td class="num"><input type="number" min="1" value="${it.qty}" style="width:64px" onchange="saleDraftItems[${i}].qty=parseInt(this.value)||1;refreshSaleForm()"></td>
+        <td class="num"><input type="number" min="0" step="0.01" value="${it.unitPrice}" style="width:80px" onchange="saleDraftItems[${i}].unitPrice=parseFloat(this.value)||0;refreshSaleForm()"></td>
+        <td class="num num">${fmtMoney(it.qty*it.unitPrice)}</td>
+        <td><button class="btn sm danger" onclick="saleDraftItems.splice(${i},1);refreshSaleForm()">&times;</button></td>
+      </tr>` + (p && it.qty>p.quantity ? `<tr><td colspan="5" class="small" style="color:var(--red);border-top:none;">Only ${p.quantity} ${esc(p.unit)} of${esc(p.name)} in stock.</td></tr>` : '');
+      }).join('')}
+    </tbody></table></div>
+    <button class="btn sm" onclick="saleDraftItems.push({productId:DB.products[0].id,qty:1,unitPrice:DB.products[0].sellingPrice});refreshSaleForm()">+ Add line</button>
+    <p class="small" style="text-align:right;margin-top:.7rem;"><strong>Total: ${fmtMoney(total)}</strong></p>
+    <div id="sl_err" class="small" style="color:var(--red);"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveSale()">Record sale</button>
+    </div>
+  `;
+}
+function refreshSaleForm(){
+  const customer = document.getElementById('sl_customer') ? document.getElementById('sl_customer').value : '';
+  const date = document.getElementById('sl_date') ? document.getElementById('sl_date').value : todayISO();
+  const payment = document.getElementById('sl_payment') ? document.getElementById('sl_payment').value : 'Cash';
+  openModal(saleFormHTML());
+  document.getElementById('sl_customer').value = customer;
+  document.getElementById('sl_date').value = date;
+  document.getElementById('sl_payment').value = payment;
+}
+function saveSale(){
+  const customer=document.getElementById('sl_customer').value.trim();
+  const date=document.getElementById('sl_date').value;
+  const payment=document.getElementById('sl_payment').value;
+  if(!customer){ document.getElementById('sl_err').textContent='Enter a customer name.'; return; }
+  if(!date){ document.getElementById('sl_err').textContent='Select a date.'; return; }
+  if(!saleDraftItems.length){ document.getElementById('sl_err').textContent='Add at least one line item.'; return; }
+  for(const it of saleDraftItems){
+    const p=DB.products.find(x=>x.id===it.productId);
+    if(!p || it.qty>p.quantity){ document.getElementById('sl_err').textContent='Not enough stock for '+(p?p.name:'a selected product')+'.'; return; }
+  }
+  let total=0, cogs=0;
+  saleDraftItems.forEach(it=>{ const p=DB.products.find(x=>x.id===it.productId); total+=it.qty*it.unitPrice; cogs+=it.qty*p.costPrice; p.quantity-=it.qty; });
+  const invNumber='INV-'+date.replace(/-/g,'')+'-'+(DB.meta.seq+1);
+  DB.sales.push({id:uid('INV-'),invNumber,customer,date,items:JSON.parse(JSON.stringify(saleDraftItems)),total,paymentType:payment,status:'Completed'});
+  const cashAcct = payment==='On Account' ? 'Accounts Receivable' : 'Cash';
+  postJournal(date,invNumber,'Sale to '+customer,[
+    {account:cashAcct,debit:total,credit:0},
+    {account:'Sales Revenue',debit:0,credit:total},
+    {account:'Cost of Goods Sold',debit:cogs,credit:0},
+    {account:'Inventory',debit:0,credit:cogs}
+  ]);
+  saveDB(); closeModal(); navigate('sales'); toast('Sale recorded; inventory and ledger updated.');
+}
+
+/* ============ ACCOUNTING ============ */
+let acctTab='journal';
+function renderAccounting(){
+  return `
+  <div class="card" style="padding-bottom:.6rem;">
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+      ${[['journal','General journal'],['ledger','General ledger'],['trial','Trial balance'],['income','Income statement']].map(([k,l])=>
+        `<button class="btn sm ${acctTab===k?'primary':''}" onclick="acctTab='${k}';renderInto()">${l}</button>`).join('')}
+    </div>
+  </div>
+  ${acctTab==='journal'?renderJournal():acctTab==='ledger'?renderLedger():acctTab==='trial'?renderTrialBalance():renderIncomeStatement()}
+  `;
+}
+function renderJournal(){
+  const entries=[...DB.journal].sort((a,b)=>b.date.localeCompare(a.date));
+  return `<div class="card"><h2>General journal</h2>
+  ${entries.length? entries.map(e=>`
+    <div style="margin-bottom:1rem;padding-bottom:.9rem;border-bottom:1px solid var(--rule);">
+      <div class="small muted" style="margin-bottom:.35rem;">${fmtDate(e.date)} &middot; ${esc(e.ref)} &mdash; ${esc(e.description)}</div>
+      <table><tbody>
+        ${e.lines.map(l=>`<tr><td style="padding-left:${l.debit?'0':'1.6rem'}">${esc(l.account)}</td><td class="num num">${l.debit?fmtMoney(l.debit):''}</td><td class="num num">${l.credit?fmtMoney(l.credit):''}</td></tr>`).join('')}
+      </tbody></table>
+    </div>`).join('') : `<div class="empty">No journal entries yet.</div>`}
+  </div>`;
+}
+function renderLedger(){
+  return `<div class="grid cols-2">${ACCOUNTS.map(acc=>{
+    let bal=0;
+    const rows=[];
+    [...DB.journal].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{
+      e.lines.filter(l=>l.account===acc).forEach(l=>{ bal += l.debit - l.credit; rows.push({date:e.date,ref:e.ref,debit:l.debit,credit:l.credit,bal}); });
+    });
+    return `<div class="card"><h2>${esc(acc)}</h2>${rows.length? `<div class="twrap"><table><thead><tr><th>Date</th><th>Ref</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td class="small">${fmtDate(r.date)}</td><td class="small num">${esc(r.ref)}</td><td class="num num">${r.debit?fmtMoney(r.debit):''}</td><td class="num num">${r.credit?fmtMoney(r.credit):''}</td><td class="num num">${fmtMoney(r.bal)}</td></tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty small">No activity.</div>`}
+    </div>`;
+  }).join('')}</div>`;
+}
+function renderTrialBalance(){
+  const totals={}; ACCOUNTS.forEach(a=>totals[a]={debit:0,credit:0});
+  DB.journal.forEach(e=>e.lines.forEach(l=>{ totals[l.account].debit+=l.debit; totals[l.account].credit+=l.credit; }));
+  let sumD=0,sumC=0;
+  const rows = ACCOUNTS.map(a=>{
+    const net = totals[a].debit - totals[a].credit;
+    const d = net>=0?net:0, c=net<0?-net:0; sumD+=d; sumC+=c;
+    return {account:a,d,c};
+  });
+  return `<div class="card"><h2>Trial balance</h2>
+  <div class="twrap"><table><thead><tr><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${esc(r.account)}</td><td class="num num">${r.d?fmtMoney(r.d):''}</td><td class="num num">${r.c?fmtMoney(r.c):''}</td></tr>`).join('')}
+    <tr style="font-weight:600;"><td>Total</td><td class="num num">${fmtMoney(sumD)}</td><td class="num num">${fmtMoney(sumC)}</td></tr>
+  </tbody></table></div></div>`;
+}
+function renderIncomeStatement(){
+  const totals={}; ACCOUNTS.forEach(a=>totals[a]={debit:0,credit:0});
+  DB.journal.forEach(e=>e.lines.forEach(l=>{ totals[l.account].debit+=l.debit; totals[l.account].credit+=l.credit; }));
+  const revenue = totals['Sales Revenue'].credit - totals['Sales Revenue'].debit;
+  const cogs = totals['Cost of Goods Sold'].debit - totals['Cost of Goods Sold'].credit;
+  const gross = revenue - cogs;
+  return `<div class="card"><h2>Income statement</h2>
+  <table><tbody>
+    <tr><td>Sales revenue</td><td class="num num">${fmtMoney(revenue)}</td></tr>
+    <tr><td>Cost of goods sold</td><td class="num num">(${fmtMoney(cogs)})</td></tr>
+    <tr style="font-weight:600;border-top:1.5px solid var(--rule-strong);"><td>Gross profit</td><td class="num num">${fmtMoney(gross)}</td></tr>
+  </tbody></table>
+  <p class="small muted" style="margin-top:.9rem;">Figures reflect all recorded sales and purchase transactions to date. Operating expenses are not yet tracked in this prototype.</p>
+  </div>`;
+}
+
+/* ============ AUTH ============ */
+const SESSION_KEY = 'ledger_ais_session';
+function doLogin(){
+  const u = document.getElementById('li_user').value.trim();
+  const p = document.getElementById('li_pass').value;
+  const errEl = document.getElementById('li_err');
+  if(!u || !p){ errEl.textContent='Enter your username and password.'; return; }
+  const admin = DB.meta.admin;
+  if(u===admin.username && p===admin.password){
+    errEl.textContent='';
+    try{ sessionStorage.setItem(SESSION_KEY, u); }catch(e){}
+    showApp();
+  } else {
+    errEl.textContent='Incorrect username or password.';
+  }
+}
+function doLogout(){
+  try{ sessionStorage.removeItem(SESSION_KEY); }catch(e){}
+  document.getElementById('shell').style.display='none';
+  document.getElementById('loginscreen').style.display='flex';
+  document.getElementById('li_user').value='';
+  document.getElementById('li_pass').value='';
+  document.getElementById('li_err').textContent='';
+  toast('Logged out.');
+}
+function showApp(){
+  document.getElementById('loginscreen').style.display='none';
+  document.getElementById('shell').style.display='flex';
+  const admin = DB.meta.admin;
+  document.getElementById('userWho').textContent = admin.name || admin.username;
+  document.getElementById('userAvatar').textContent = (admin.name||admin.username).charAt(0).toUpperCase();
+  document.getElementById('todaylabel').textContent = fmtDate(todayISO());
+  navigate('dashboard');
+}
+function checkSession(){
+  let session=null;
+  try{ session = sessionStorage.getItem(SESSION_KEY); }catch(e){}
+  if(session && session===DB.meta.admin.username){ showApp(); }
+}
+
+/* ============ INIT ============ */
+loadDB();
+checkSession();
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+</script>
+</body>
+</html>
